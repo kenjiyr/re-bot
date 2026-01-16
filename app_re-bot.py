@@ -3,15 +3,12 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 # --- 1. KONFIGURATION & SICHERHEIT ---
-# Das Passwort für den Zugang zur Web-App
 ACCESS_PASSWORD = "2681Dtc7978@"
 
 
 def check_password():
-    """Prüft das Passwort und gibt den App-Inhalt nur bei Erfolg frei."""
     if "password_correct" not in st.session_state:
         st.session_state.password_correct = False
-
     if st.session_state.password_correct:
         return True
 
@@ -29,84 +26,78 @@ def check_password():
     return False
 
 
-# --- 2. DER SENIOR RE PROMPT (SOPHIST LOGIK) ---
+# --- 2. VERFEINERTER SENIOR RE PROMPT ---
 SYSTEM_PROMPT = """Du bist ein Senior Requirements Engineer. 
-Dein Ziel ist es, Anforderungen exakt nach der SOPHIST-Masterschablone zu formulieren.
+Dein Ziel ist die perfekte Anforderung nach der SOPHIST-Masterschablone.
 
-DIE SCHABLONE:
-[Bedingung] + [Systemname] + [Modalverb: muss/soll/kann] + [Prozess/Funktion] + [Objekt].
+SCHABLONE: [Bedingung] + [Systemname] + [Muss/Soll/Kann] + [Prozess] + [Objekt].
 
-DEIN WORKFLOW:
-1. Analysiere den Input des Nutzers.
-2. Wenn Informationen fehlen, frage HÖFLICH nach genau EINEM fehlenden Teil der Schablone.
-3. Wenn alle Informationen vorliegen, gib die finale Anforderung fettgedruckt aus.
-4. Führe ein Review durch: Prüfe auf Passivsätze und vage Begriffe (z.B. 'schnell', 'benutzerfreundlich').
-5. Gib am Ende einen Qualitäts-Score von 1-10 an.
+DEIN EXPERTEN-VERHALTEN:
+1. Prüfe den Input: Fehlt ein Teil der Schablone? Frage gezielt nach EINEM Teil.
+2. Eliminiere Vagheiten: Verwandle Adjektive wie 'schnell', 'sicher' oder 'benutzerfreundlich' in messbare Zahlen (z.B. 'unter 200ms').
+3. Formuliere Aktiv: Keine Passivsätze ("Die Rechnung wird erstellt" -> "Das System muss die Rechnung erstellen").
+4. Abschluss: Wenn fertig, gib die Anforderung fett aus, erstelle 3 Akzeptanzkriterien und einen Score (1-10).
 
-Antworte immer auf Deutsch und bleibe professionell."""
+Antworte immer auf Deutsch."""
 
 # --- 3. UI INITIALISIERUNG ---
-st.set_page_config(page_title="SOPHIST RE-Bot (Gemini)", page_icon="🤖")
+st.set_page_config(page_title="Senior RE-Bot (Resilient Gemini)", page_icon="🤖")
 
 if check_password():
     st.title("Senior RE-Assistant (Gemini) 🤖")
     st.markdown("---")
 
-    # API-Key Logik: Erst Secrets prüfen, dann Sidebar-Input
-    google_api_key = None
-    if "GOOGLE_API_KEY" in st.secrets:
-        google_api_key = st.secrets["GOOGLE_API_KEY"]
+    # API-Key Logik
+    google_api_key = st.secrets.get("GOOGLE_API_KEY") or st.sidebar.text_input("Google API Key", type="password")
 
     with st.sidebar:
-        st.header("Einstellungen")
-        if not google_api_key:
-            google_api_key = st.text_input("Google API Key", type="password")
-        else:
-            st.success("API Key aus Secrets geladen ✅")
-
+        if "GOOGLE_API_KEY" in st.secrets:
+            st.success("Key aus Secrets geladen ✅")
         if st.button("Chat zurücksetzen"):
             st.session_state.messages = [SystemMessage(content=SYSTEM_PROMPT)]
             st.rerun()
 
     if not google_api_key:
-        st.warning("Bitte gib einen Google API Key ein, um zu starten.")
+        st.warning("Bitte API Key hinterlegen.")
     else:
-        try:
-            # Gemini Modell initialisieren
-            llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash-latest",
-                google_api_key=google_api_key,
-                temperature=0.2
-            )
+        # --- DYNAMISCHE MODELL-AUSWAHL (RESILIENZ) ---
+        if "llm" not in st.session_state:
+            with st.spinner("Verbindung zu Gemini wird aufgebaut..."):
+                model_options = ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-1.5-flash"]
+                success = False
+                for model_name in model_options:
+                    try:
+                        temp_llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=google_api_key,
+                                                          temperature=0.2)
+                        # Test-Aufruf
+                        temp_llm.invoke([HumanMessage(content="Hi")])
+                        st.session_state.llm = temp_llm
+                        success = True
+                        break
+                    except Exception:
+                        continue
+                if not success:
+                    st.error("Modell-Verbindung fehlgeschlagen.")
+                    st.stop()
 
-            # Chat-Verlauf im Speicher halten
-            if "messages" not in st.session_state:
-                st.session_state.messages = [SystemMessage(content=SYSTEM_PROMPT)]
+        # Chat-Historie
+        if "messages" not in st.session_state:
+            st.session_state.messages = [SystemMessage(content=SYSTEM_PROMPT)]
 
-            # Verlauf anzeigen
-            for msg in st.session_state.messages:
-                if isinstance(msg, HumanMessage):
-                    st.chat_message("user").write(msg.content)
-                elif isinstance(msg, AIMessage):
-                    st.chat_message("assistant").write(msg.content)
+        for msg in st.session_state.messages:
+            if isinstance(msg, HumanMessage):
+                st.chat_message("user").write(msg.content)
+            elif isinstance(msg, AIMessage):
+                st.chat_message("assistant").write(msg.content)
 
-            # Nutzer-Eingabe verarbeiten
-            if prompt := st.chat_input("Was soll das System können?"):
-                st.session_state.messages.append(HumanMessage(content=prompt))
-                st.chat_message("user").write(prompt)
+        if prompt := st.chat_input("Was soll das System können?"):
+            st.session_state.messages.append(HumanMessage(content=prompt))
+            st.chat_message("user").write(prompt)
 
-                with st.chat_message("assistant"):
-                    response = llm.invoke(st.session_state.messages)
-                    st.write(response.content)
-                    st.session_state.messages.append(AIMessage(content=response.content))
+            with st.chat_message("assistant"):
+                response = st.session_state.llm.invoke(st.session_state.messages)
+                st.write(response.content)
+                st.session_state.messages.append(AIMessage(content=response.content))
 
-                    # Export-Option bei fertiger Anforderung
-                    if "Score" in response.content:
-                        st.download_button(
-                            label="📥 Anforderung exportieren",
-                            data=response.content,
-                            file_name="requirement.md",
-                            mime="text/markdown"
-                        )
-        except Exception as e:
-            st.error(f"Ein Fehler ist aufgetreten: {e}")
+                if "Score" in response.content:
+                    st.download_button("📥 Export .md", response.content, "req.md", "text/markdown")
