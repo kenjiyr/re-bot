@@ -1,10 +1,13 @@
 import streamlit as st
 import os
-# WICHTIG: Wir nutzen die neuesten Imports
+
+# Diese Zeile erzwingt die stabile API-Version bei Google direkt
+os.environ["GOOGLE_API_VERSION"] = "v1"
+
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
-# --- 1. KONFIGURATION & SICHERHEIT ---
+# --- 1. SICHERHEIT ---
 ACCESS_PASSWORD = "2681Dtc7978@"
 
 
@@ -13,7 +16,6 @@ def check_password():
         st.session_state.password_correct = False
     if st.session_state.password_correct:
         return True
-
     placeholder = st.empty()
     with placeholder.container():
         st.title("RE-Bot Login 🔐")
@@ -28,55 +30,52 @@ def check_password():
     return False
 
 
-# --- 2. SENIOR RE PROMPT ---
-SYSTEM_PROMPT = """Du bist ein Senior Requirements Engineer. 
-Dein Ziel ist die perfekte Anforderung nach der SOPHIST-Masterschablone.
-SCHABLONE: [Bedingung] + [Systemname] + [Muss/Soll/Kann] + [Prozess] + [Objekt].
-Antworte immer auf Deutsch."""
+# --- 2. PROMPT ---
+SYSTEM_PROMPT = "Du bist ein Senior RE. Nutze die SOPHIST-Schablone. Antworte auf Deutsch."
 
-# --- 3. UI INITIALISIERUNG ---
+# --- 3. UI & LOGIK ---
 st.set_page_config(page_title="RE-Bot Final Fix", page_icon="🤖")
 
 if check_password():
     st.title("Senior RE-Assistant (Gemini) 🤖")
-    st.markdown("---")
 
+    # Key aus Secrets oder Sidebar
     google_api_key = st.secrets.get("GOOGLE_API_KEY") or st.sidebar.text_input("Google API Key", type="password")
 
     if not google_api_key:
         st.warning("Bitte API Key hinterlegen.")
     else:
-        # --- DER ULTIMATIVE FIX ---
         if "llm" not in st.session_state:
             try:
-                # Wir erzwingen hier v1 statt v1beta
+                # Wir nutzen hier den sichersten Transportweg (REST)
                 llm = ChatGoogleGenerativeAI(
                     model="gemini-1.5-flash",
                     google_api_key=google_api_key,
                     temperature=0.2,
-                    transport="rest"  # Wechsel von gRPC auf REST (stabiler in Streamlit Cloud)
+                    transport="rest"
                 )
-                # Kleiner Test-Invoke
+                # Sofortiger Test
                 llm.invoke([HumanMessage(content="Hi")])
                 st.session_state.llm = llm
                 st.sidebar.success("Verbindung steht! ✅")
             except Exception as e:
-                st.error(f"Fehler: {str(e)}")
+                st.error(f"Technischer Fehler: {str(e)}")
                 st.stop()
 
-        # Chat-Historie
+        # Chat-Historie initialisieren
         if "messages" not in st.session_state:
             st.session_state.messages = [SystemMessage(content=SYSTEM_PROMPT)]
 
+        # Chat-Verlauf anzeigen
         for msg in st.session_state.messages:
-            role = "user" if isinstance(msg, HumanMessage) else "assistant"
             if not isinstance(msg, SystemMessage):
+                role = "user" if isinstance(msg, HumanMessage) else "assistant"
                 st.chat_message(role).write(msg.content)
 
-        if prompt := st.chat_input("Was soll das System können?"):
+        # Eingabe
+        if prompt := st.chat_input("Deine Anforderung..."):
             st.session_state.messages.append(HumanMessage(content=prompt))
             st.chat_message("user").write(prompt)
-
             with st.chat_message("assistant"):
                 response = st.session_state.llm.invoke(st.session_state.messages)
                 st.write(response.content)
