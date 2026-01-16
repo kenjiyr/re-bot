@@ -4,7 +4,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 # --- 1. KONFIGURATION & SICHERHEIT ---
 # Das Passwort für den Zugang zur Web-App
-ACCESS_PASSWORD = "mein_geheimnis"
+ACCESS_PASSWORD = "2681Dtc7978@"
 
 
 def check_password():
