@@ -63,21 +63,22 @@ if check_password():
         # --- DYNAMISCHE MODELL-AUSWAHL (RESILIENZ) ---
         if "llm" not in st.session_state:
             with st.spinner("Verbindung zu Gemini wird aufgebaut..."):
-                model_options = ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-1.5-flash"]
-                success = False
-                for model_name in model_options:
-                    try:
-                        temp_llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=google_api_key,
-                                                          temperature=0.2)
-                        # Test-Aufruf
-                        temp_llm.invoke([HumanMessage(content="Hi")])
-                        st.session_state.llm = temp_llm
-                        success = True
-                        break
-                    except Exception:
-                        continue
-                if not success:
-                    st.error("Modell-Verbindung fehlgeschlagen.")
+                # Wir testen zuerst das stabilste Basis-Modell
+                model_to_test = "gemini-1.5-flash"
+                try:
+                    llm_test = ChatGoogleGenerativeAI(
+                        model=model_to_test,
+                        google_api_key=google_api_key,
+                        temperature=0.2
+                    )
+                    # Der entscheidende Test-Aufruf
+                    llm_test.invoke([HumanMessage(content="Hi")])
+                    st.session_state.llm = llm_test
+                    st.success(f"Verbunden mit {model_to_test}")
+                except Exception as e:
+                    st.error(f"Kritischer Verbindungsfehler: {str(e)}")
+                    st.info(
+                        "Tipp: Prüfe in Google AI Studio, ob dein Key aktiv ist und ob Billing (auch für Free Tier) eingerichtet sein muss.")
                     st.stop()
 
         # Chat-Historie
