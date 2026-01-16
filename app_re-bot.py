@@ -1,6 +1,6 @@
 import streamlit as st
 from langchain_openai import ChatOpenAI
-from langchain.schema import SystemMessage, HumanMessage, AIMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 # --- 1. KONFIGURATION & SICHERHEIT ---
 # In der Produktion würden wir das über Umgebungsvariablen lösen.
