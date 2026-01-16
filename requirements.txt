@@ -1,5 +1,4 @@
 streamlit
-langchain
-langchain-community
+langchain>=0.3.0
+langchain-google-genai>=2.0.0
 langchain-core
-langchain-google-genai

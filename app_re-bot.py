@@ -60,26 +60,33 @@ if check_password():
     if not google_api_key:
         st.warning("Bitte API Key hinterlegen.")
     else:
-        # --- DYNAMISCHE MODELL-AUSWAHL (RESILIENZ) ---
+        # --- FIX FÜR DEN 404 FEHLER ---
         if "llm" not in st.session_state:
             with st.spinner("Verbindung zu Gemini wird aufgebaut..."):
-                # Wir testen zuerst das stabilste Basis-Modell
-                model_to_test = "gemini-1.5-flash"
                 try:
+                    # Wir nutzen hier 'gemini-1.5-flash' direkt.
+                    # Falls das nicht geht, ist 'gemini-pro' der sicherste Fallback.
                     llm_test = ChatGoogleGenerativeAI(
-                        model=model_to_test,
+                        model="gemini-1.5-flash",
                         google_api_key=google_api_key,
-                        temperature=0.2
+                        temperature=0.2,
+                        convert_system_message_to_human=True  # Hilft bei älteren API-Versionen
                     )
-                    # Der entscheidende Test-Aufruf
                     llm_test.invoke([HumanMessage(content="Hi")])
                     st.session_state.llm = llm_test
-                    st.success(f"Verbunden mit {model_to_test}")
                 except Exception as e:
-                    st.error(f"Kritischer Verbindungsfehler: {str(e)}")
-                    st.info(
-                        "Tipp: Prüfe in Google AI Studio, ob dein Key aktiv ist und ob Billing (auch für Free Tier) eingerichtet sein muss.")
-                    st.stop()
+                    # Zweiter Versuch mit dem Standard-Pro Modell
+                    try:
+                        st.info("Versuche stabilen Fallback (gemini-pro)...")
+                        llm_test = ChatGoogleGenerativeAI(
+                            model="gemini-pro",
+                            google_api_key=google_api_key
+                        )
+                        llm_test.invoke([HumanMessage(content="Hi")])
+                        st.session_state.llm = llm_test
+                    except Exception as e2:
+                        st.error(f"Verbindungsfehler: {str(e2)}")
+                        st.stop()
 
         # Chat-Historie
         if "messages" not in st.session_state:
