@@ -74,7 +74,7 @@ if check_password():
         try:
             # Gemini Modell initialisieren
             llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
+                model="gemini-1.5-flash-latest",
                 google_api_key=google_api_key,
                 temperature=0.2
             )
