@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 
-# WICHTIG: Wir erzwingen die API-Version V1 vor allen anderen Imports
+# WICHTIG: Wir erzwingen die API-Version V1 für das gesamte Environment
 os.environ["GOOGLE_API_VERSION"] = "v1"
 
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -31,36 +31,40 @@ def check_password():
 
 
 # --- 2. LOGIK ---
-SYSTEM_PROMPT = "Du bist ein Senior RE. Nutze die SOPHIST-Schablone. Antworte auf Deutsch."
+SYSTEM_PROMPT = """Du bist ein Senior RE. Nutze die SOPHIST-Schablone: 
+[Bedingung] + [Systemname] + [Muss/Soll/Kann] + [Prozess] + [Objekt]. 
+Antworte immer auf Deutsch."""
 
-st.set_page_config(page_title="RE-Bot Stable", page_icon="🤖")
+st.set_page_config(page_title="RE-Bot Stable Version", page_icon="🤖")
 
 if check_password():
     st.title("Senior RE-Assistant (Gemini) 🤖")
 
+    # Key-Abfrage (Priorität auf Secrets)
     google_api_key = st.secrets.get("GOOGLE_API_KEY") or st.sidebar.text_input("Google API Key", type="password")
 
     if not google_api_key:
-        st.warning("Bitte API Key hinterlegen.")
+        st.warning("Bitte API Key hinterlegen (in der Sidebar oder den Secrets).")
     else:
         if "llm" not in st.session_state:
             try:
-                # Wir nutzen 'gemini-1.5-flash' ohne Präfix und erzwingen REST
+                # Wir verzichten auf gRPC und nutzen REST für maximale Kompatibilität
                 llm = ChatGoogleGenerativeAI(
                     model="gemini-1.5-flash",
                     google_api_key=google_api_key,
                     temperature=0.2,
                     transport="rest"
                 )
-                # Test-Aufruf
-                llm.invoke([HumanMessage(content="Hi")])
+                # Test-Aufruf zur Verifizierung
+                llm.invoke([HumanMessage(content="Verbindungstest")])
                 st.session_state.llm = llm
-                st.sidebar.success("Verbindung steht! ✅")
+                st.sidebar.success("Verbindung hergestellt! ✅")
             except Exception as e:
-                st.error(f"Technischer Fehler: {str(e)}")
-                st.info("Versuche 'Reboot App' in den Streamlit Settings, falls dieser Fehler bleibt.")
+                st.error(f"Kritischer Fehler: {str(e)}")
+                st.info("Hinweis: Falls dieser Fehler bleibt, lösche die App in Streamlit Cloud und erstelle sie neu.")
                 st.stop()
 
+        # Chat-Verlauf
         if "messages" not in st.session_state:
             st.session_state.messages = [SystemMessage(content=SYSTEM_PROMPT)]
 
@@ -69,7 +73,7 @@ if check_password():
                 role = "user" if isinstance(msg, HumanMessage) else "assistant"
                 st.chat_message(role).write(msg.content)
 
-        if prompt := st.chat_input("Deine Anforderung..."):
+        if prompt := st.chat_input("Beschreibe deine Anforderung..."):
             st.session_state.messages.append(HumanMessage(content=prompt))
             st.chat_message("user").write(prompt)
             with st.chat_message("assistant"):
