@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 
-# Diese Zeile erzwingt die stabile API-Version bei Google direkt
+# WICHTIG: Wir erzwingen die API-Version V1 vor allen anderen Imports
 os.environ["GOOGLE_API_VERSION"] = "v1"
 
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -30,16 +30,14 @@ def check_password():
     return False
 
 
-# --- 2. PROMPT ---
+# --- 2. LOGIK ---
 SYSTEM_PROMPT = "Du bist ein Senior RE. Nutze die SOPHIST-Schablone. Antworte auf Deutsch."
 
-# --- 3. UI & LOGIK ---
-st.set_page_config(page_title="RE-Bot Final Fix", page_icon="🤖")
+st.set_page_config(page_title="RE-Bot Stable", page_icon="🤖")
 
 if check_password():
     st.title("Senior RE-Assistant (Gemini) 🤖")
 
-    # Key aus Secrets oder Sidebar
     google_api_key = st.secrets.get("GOOGLE_API_KEY") or st.sidebar.text_input("Google API Key", type="password")
 
     if not google_api_key:
@@ -47,32 +45,30 @@ if check_password():
     else:
         if "llm" not in st.session_state:
             try:
-                # Wir nutzen hier den sichersten Transportweg (REST)
+                # Wir nutzen 'gemini-1.5-flash' ohne Präfix und erzwingen REST
                 llm = ChatGoogleGenerativeAI(
                     model="gemini-1.5-flash",
                     google_api_key=google_api_key,
                     temperature=0.2,
                     transport="rest"
                 )
-                # Sofortiger Test
+                # Test-Aufruf
                 llm.invoke([HumanMessage(content="Hi")])
                 st.session_state.llm = llm
                 st.sidebar.success("Verbindung steht! ✅")
             except Exception as e:
                 st.error(f"Technischer Fehler: {str(e)}")
+                st.info("Versuche 'Reboot App' in den Streamlit Settings, falls dieser Fehler bleibt.")
                 st.stop()
 
-        # Chat-Historie initialisieren
         if "messages" not in st.session_state:
             st.session_state.messages = [SystemMessage(content=SYSTEM_PROMPT)]
 
-        # Chat-Verlauf anzeigen
         for msg in st.session_state.messages:
             if not isinstance(msg, SystemMessage):
                 role = "user" if isinstance(msg, HumanMessage) else "assistant"
                 st.chat_message(role).write(msg.content)
 
-        # Eingabe
         if prompt := st.chat_input("Deine Anforderung..."):
             st.session_state.messages.append(HumanMessage(content=prompt))
             st.chat_message("user").write(prompt)
